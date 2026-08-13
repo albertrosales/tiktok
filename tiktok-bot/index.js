@@ -56,6 +56,23 @@ function extractTikTokUrl(text) {
   return match ? match[0] : null;
 }
 
+// Obtiene el título/descripción del video de TikTok (metadatos, sin descargar el archivo)
+function getTikTokTitle(url) {
+  return new Promise((resolve) => {
+    const proc = spawn('yt-dlp', [url, '--print', '%(title)s', '--no-warnings', '--no-playlist']);
+
+    let stdout = '';
+    proc.stdout.on('data', (data) => { stdout += data.toString(); });
+
+    proc.on('close', () => {
+      const title = stdout.trim();
+      resolve(title || null);
+    });
+
+    proc.on('error', () => resolve(null));
+  });
+}
+
 // Descarga el video usando yt-dlp, priorizando la mejor calidad disponible sin marca de agua
 function downloadTikTok(url, outputTemplate) {
   return new Promise((resolve, reject) => {
@@ -109,7 +126,10 @@ bot.on('message', async (msg) => {
   const outputTemplate = path.join(DOWNLOAD_DIR, `${id}.%(ext)s`);
 
   try {
-    await downloadTikTok(url, outputTemplate);
+    const [, title] = await Promise.all([
+      downloadTikTok(url, outputTemplate),
+      getTikTokTitle(url),
+    ]);
 
     // Buscar el archivo generado (yt-dlp resuelve la extensión real)
     const files = fs.readdirSync(DOWNLOAD_DIR).filter((f) => f.startsWith(id));
@@ -118,6 +138,9 @@ bot.on('message', async (msg) => {
     const filePath = path.join(DOWNLOAD_DIR, files[0]);
     const stats = fs.statSync(filePath);
 
+    // Telegram limita el caption a 1024 caracteres
+    const caption = title ? title.slice(0, 1024) : undefined;
+
     // Telegram limita el envío de video vía bot API a 50MB
     if (stats.size > 50 * 1024 * 1024) {
       await bot.editMessageText(
@@ -125,7 +148,12 @@ bot.on('message', async (msg) => {
         { chat_id: chatId, message_id: statusMsg.message_id }
       );
     } else {
-      await bot.sendVideo(chatId, filePath, {}, { filename: 'tiktok.mp4', contentType: 'video/mp4' });
+      await bot.sendVideo(
+        chatId,
+        filePath,
+        { caption },
+        { filename: 'tiktok.mp4', contentType: 'video/mp4' }
+      );
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
     }
 
