@@ -73,12 +73,14 @@ function getTikTokTitle(url) {
   });
 }
 
-// Descarga el video usando yt-dlp, priorizando la mejor calidad disponible sin marca de agua
+// Descarga el video usando yt-dlp, priorizando el formato ya combinado de TikTok
+// (video+audio en un solo stream) para evitar problemas de sincronización/fotogramas
+// al forzar un merge manual de pistas separadas.
 function downloadTikTok(url, outputTemplate) {
   return new Promise((resolve, reject) => {
     const args = [
       url,
-      '-f', 'bestvideo+bestaudio/best', // mejor calidad de video + audio
+      '-f', 'best[ext=mp4]/bestvideo+bestaudio/best', // prioriza el mp4 ya combinado; fallback a merge manual
       '--merge-output-format', 'mp4',
       '-o', outputTemplate,
       '--no-playlist',
