@@ -24,8 +24,8 @@ if (!RENDER_URL) {
   process.exit(1);
 }
 
-// Modo webhook: Render necesita un puerto HTTP abierto para no apagar el servicio
-const bot = new TelegramBot(TOKEN, { webHook: { port: PORT } });
+// Modo webhook: usamos Express como único servidor HTTP (sin que la librería abra el suyo)
+const bot = new TelegramBot(TOKEN);
 const webhookPath = `/bot${TOKEN}`;
 bot.setWebHook(`${RENDER_URL}${webhookPath}`);
 
